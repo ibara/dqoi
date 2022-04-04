@@ -27,13 +27,15 @@ int
 main(int argc, char *argv[])
 {
 	Display *disp;
+	XVisualInfo vinfo;
 	Window win;
+	XSetWindowAttributes attr;
+	GC gc;
 	XImage *ximg;
 	XEvent e;
 	qoi_desc desc;
 	uint64_t i;
 	uint32_t *pixels;
-	int scr;
 
 	if (argc != 2) {
 		(void) fputs("usage: dqoi file.qoi\n", stderr);
@@ -68,15 +70,23 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	scr = DefaultScreen(disp);
-	win = XCreateSimpleWindow(disp, RootWindow(disp, scr), 0, 0,
-	    desc.width, desc.height, 0, 0, 0);
+	XMatchVisualInfo(disp, DefaultScreen(disp), 32, TrueColor, &vinfo);
+
+	attr.colormap = XCreateColormap(disp, DefaultRootWindow(disp),
+	    vinfo.visual, AllocNone);
+	attr.background_pixel = None;
+	attr.border_pixel = None;
+
+	win = XCreateWindow(disp, DefaultRootWindow(disp), 0, 0, desc.width,
+	    desc.height, 0, vinfo.depth, InputOutput, vinfo.visual,
+	    CWColormap | CWBackPixel | CWBorderPixel, &attr);
 
 	XStoreName(disp, win, argv[1]);
 
-	ximg = XCreateImage(disp, DefaultVisual(disp, scr),
-	    DefaultDepth(disp, scr), ZPixmap, 0, (char *) pixels, desc.width,
-	    desc.height, 8, 0);
+	gc = XCreateGC(disp, win, 0, 0);
+
+	ximg = XCreateImage(disp, vinfo.visual, vinfo.depth, ZPixmap, 0,
+	    (char *) pixels, desc.width, desc.height, 32, 0);
 
 	XSelectInput(disp, win, ExposureMask | KeyPressMask);
 	XMapWindow(disp, win);
@@ -85,8 +95,8 @@ main(int argc, char *argv[])
 		XNextEvent(disp, &e);
 
 		if (e.type == Expose) {
-			XPutImage(disp, win, DefaultGC(disp, scr), ximg, 0, 0,
-			    0, 0, desc.width, desc.height);
+			XPutImage(disp, win, gc, ximg, 0, 0, 0, 0, desc.width,
+			    desc.height);
 		}
 
 		if (e.type == KeyPress)
