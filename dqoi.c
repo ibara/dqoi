@@ -36,23 +36,25 @@ main(int argc, char *argv[])
 	qoi_desc desc;
 	uint64_t i;
 	uint32_t *pixels;
+	int ac = 1;
 
-	if (argc != 2) {
-		(void) fputs("usage: dqoi file.qoi\n", stderr);
+	if (argc < 2) {
+		(void) fputs("usage: dqoi file.qoi [...]\n", stderr);
 
 		return 1;
 	}
 
-	if ((pixels = qoi_read(argv[1], &desc, 4)) == NULL) {
+again:
+	if ((pixels = qoi_read(argv[ac], &desc, 4)) == NULL) {
 		(void) fprintf(stderr, "dqoi: error: read failed: %s\n",
-		    argv[1]);
+		    argv[ac]);
 
 		return 1;
 	}
 
 	if (desc.width == 0 || desc.height == 0) {
 		(void) fprintf(stderr, "dqoi: error: invalid image: %s\n",
-		    argv[1]);
+		    argv[ac]);
 
 		return 1;
 	}
@@ -81,7 +83,7 @@ main(int argc, char *argv[])
 	    desc.height, 0, vinfo.depth, InputOutput, vinfo.visual,
 	    CWColormap | CWBackPixel | CWBorderPixel, &attr);
 
-	XStoreName(disp, win, argv[1]);
+	XStoreName(disp, win, argv[ac]);
 
 	gc = XCreateGC(disp, win, 0, 0);
 
@@ -99,13 +101,36 @@ main(int argc, char *argv[])
 			    desc.height);
 		}
 
-		if (e.type == KeyPress)
+		if (e.type == KeyPress) {
+			switch (e.xkey.keycode) {
+			case 0x64:
+				if (ac == 1)
+					continue;
+
+				break;
+			case 0x66:
+				if (ac == argc - 1)
+					continue;
+			}
+
 			break;
+		}
 	}
 
 	XCloseDisplay(disp);
 
 	free(pixels);
+
+	switch (e.xkey.keycode) {
+	case 0x64:
+		--ac;
+
+		goto again;
+	case 0x66:
+		++ac;
+
+		goto again;
+	}
 
 	return 0;
 }
